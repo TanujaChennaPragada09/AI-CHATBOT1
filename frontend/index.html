@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🤖 TanujaNikitha AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:Poppins;height:100vh;background:#eef2ff;overflow:hidden;}
+/* LOGIN */
+#login{height:100vh;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg,#00c6ff,#0072ff,#7f00ff);position:relative;overflow:hidden;}
+.bubble{position:absolute;bottom:-120px;background:rgba(255,255,255,.25);border-radius:50%;animation:float 20s infinite linear;}
+@keyframes float{to{transform:translateY(-140vh)}}
+.wave{position:absolute;bottom:-40px;width:200%;height:160px;background:rgba(255,255,255,.18);border-radius:100%;animation:wave 12s infinite linear;}
+.wave2{animation-duration:18s;opacity:.25}
+@keyframes wave{to{transform:translateX(-50%)}}
+.login-box{background:#ffffffee;width:360px;padding:40px;border-radius:24px;box-shadow:0 30px 70px rgba(0,0,0,.35);text-align:center;z-index:2;}
+.login-box h2{color:#4f46e5;margin-bottom:10px}
+.login-box p{font-size:13px;color:#555}
+.login-box input{width:100%;padding:14px;margin-top:16px;border-radius:14px;border:1px solid #ccc;}
+.login-box button{margin-top:16px;width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;cursor:pointer;}
+/* CHAT */
+#chat{display:none;height:100vh;display:flex;}
+.sidebar{width:260px;background:#0f172a;color:#fff;padding:16px;display:flex;flex-direction:column;}
+.sidebar h3{margin-bottom:12px}
+#history{flex:1;overflow-y:auto}
+.history-item{background:rgba(255,255,255,.12);padding:8px;border-radius:8px;margin-bottom:6px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.clear-btn{margin-top:10px;padding:10px;border:none;border-radius:8px;background:#ef4444;color:#fff;cursor:pointer;}
+.chat-app{flex:1;display:flex;flex-direction:column;position:relative;}
+.header{height:56px;padding:0 16px;background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:space-between;}
+.header button{padding:6px 12px;border:none;border-radius:8px;background:#ef4444;color:#fff;cursor:pointer;position:absolute;right:16px;top:8px;}
+#chat-box{flex:1;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#f8fafc;}
+.message{max-width:72%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.5;white-space:pre-wrap;}
+.user{align-self:flex-end;background:linear-gradient(135deg,#4f46e5,#6366f1);color:#fff;border-bottom-right-radius:4px;}
+.bot{background:#fff;border-bottom-left-radius:4px;}
+.message img{max-width:100%;border-radius:12px;margin-top:8px;}
+.input-bar{padding:12px;display:flex;gap:8px;background:#fff;border-top:1px solid #ddd;align-items:center;}
+.input-bar input{flex:1;padding:12px;border-radius:20px;border:1px solid #ccc;}
+.input-bar button{width:44px;height:44px;border-radius:50%;border:none;background:#4f46e5;color:#fff;cursor:pointer;}
+.file-btn{background:#22c55e}
+.mic-btn{background:#ef4444}
+.mic-btn.listening{background:#22c55e}
+.img-btn{background:#f59e0b}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="bubble" style="width:90px;height:90px;left:10%"></div>
+  <div class="bubble" style="width:140px;height:140px;left:70%;animation-duration:28s"></div>
+  <div class="bubble" style="width:70px;height:70px;left:40%"></div>
+  <div class="wave"></div>
+  <div class="wave wave2"></div>
+
+  <div class="login-box">
+    <h2>🤖 TanujaNikitha AI</h2>
+    <p>Smart multilingual AI assistant</p>
+    <input id="username" placeholder="Enter username">
+    <button onclick="doLogin()">Login</button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="chat">
+  <div class="sidebar">
+    <h3>💬 History</h3>
+    <div id="history"></div>
+    <button class="clear-btn" onclick="clearHistory()">🗑 Clear History</button>
+  </div>
+
+  <div class="chat-app">
+    <div class="header">
+      <div>🤖 TanujaNikitha AI</div>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div class="input-bar">
+      <input id="user-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendMessage()">
+      <button onclick="sendMessage()">➤</button>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+
+      <!-- File upload + prompt -->
+      <input type="text" id="file-prompt" placeholder="Enter prompt for uploaded file..." style="flex:1; margin-right:4px;">
+      <button class="file-btn" onclick="document.getElementById('file').click()">📂</button>
+      <input type="file" id="file" hidden onchange="uploadFileWithPrompt()">
+
+      <button class="img-btn" onclick="generateImage()">🖼</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://44.195.33.41:8080";
+const loginDiv=document.getElementById("login");
+const chatDiv=document.getElementById("chat");
+const chatBox=document.getElementById("chat-box");
+const historyDiv=document.getElementById("history");
+const userInput=document.getElementById("user-input");
+const micBtn=document.getElementById("micBtn");
+let recognition,listening=false;
+
+// ================= API STATUS CHECK =================
+async function checkAPI() {
+  try {
+    const r = await fetch(API+"/");
+    const d = await r.json();
+    const u=localStorage.getItem("username");
+    loginDiv.style.display=u?"none":"flex";
+    chatDiv.style.display=u?"flex":"none";
+    if(u) loadHistory();
+  } catch(e){
+    loginDiv.style.display="flex";
+    chatDiv.style.display="none";
+  }
+}
+
+// ================= LOGIN/LOGOUT =================
+function doLogin(){
+  const uname = document.getElementById("username").value.trim();
+  if(!uname) return;
+  localStorage.setItem("username", uname);
+  location.reload();
+}
+function logout(){
+  localStorage.clear();
+  location.reload();
+}
+
+// ================= CHAT =================
+function append(text,type){
+  const d=document.createElement("div");
+  d.className="message "+type;
+  d.textContent=text;
+  chatBox.appendChild(d);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+function addToSidebar(text){
+  const d=document.createElement("div");
+  d.className="history-item";
+  d.textContent=text;
+  d.onclick=()=>{userInput.value=text; sendMessage();};
+  historyDiv.prepend(d);
+}
+
+/* CHAT STREAM */
+async function sendMessage(){
+  const msg=userInput.value.trim();
+  if(!msg) return;
+  append(msg,"user");
+  addToSidebar(msg);
+  userInput.value="";
+
+  const bot=document.createElement("div");
+  bot.className="message bot";
+  chatBox.appendChild(bot);
+
+  const r=await fetch(API+"/chat-stream",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      message:msg,
+      username:localStorage.username
+    })
+  });
+
+  const reader=r.body.getReader();
+  const decoder=new TextDecoder();
+  let buffer="";
+  while(true){
+    const {value,done}=await reader.read();
+    if(done) break;
+    buffer+=decoder.decode(value,{stream:true});
+    const lines=buffer.split("\n");
+    for(let i=0;i<lines.length-1;i++){
+      try{
+        const data=JSON.parse(lines[i]);
+        if(data && data.text){
+          bot.textContent+=data.text;
+          chatBox.scrollTop=chatBox.scrollHeight;
+        }
+      }catch(e){}
+    }
+    buffer=lines[lines.length-1];
+  }
+}
+
+/* MIC */
+function toggleMic(){
+  if(!('webkitSpeechRecognition' in window)) return alert("Mic not supported");
+  if(!recognition){
+    recognition=new webkitSpeechRecognition();
+    recognition.lang="en-IN";
+    recognition.onresult=e=>{
+      userInput.value=e.results[0][0].transcript;
+      sendMessage();
+    };
+    recognition.onend=()=>{listening=false; micBtn.classList.remove("listening");};
+  }
+  if(!listening){recognition.start(); listening=true; micBtn.classList.add("listening");}
+  else recognition.stop();
+}
+
+/* FILE UPLOAD WITH PROMPT */
+async function uploadFileWithPrompt(){
+  const f=document.getElementById("file").files[0];
+  if(!f)return;
+  const prompt = document.getElementById("file-prompt").value.trim();
+  if(!prompt) return alert("Enter a prompt for the file!");
+  const fd=new FormData();
+  fd.append("file", f);
+  fd.append("prompt", prompt);
+  const r=await fetch(API+"/upload-with-prompt",{method:"POST",body:fd});
+  const data=await r.json();
+  append("📄 File uploaded: "+data.filename,"bot");
+  append(data.ai_response,"bot");
+  document.getElementById("file").value="";
+  document.getElementById("file-prompt").value="";
+}
+
+/* IMAGE */
+async function generateImage(){
+  const prompt=userInput.value.trim();
+  if(!prompt) return;
+  append(prompt,"user");
+  addToSidebar(prompt);
+  userInput.value="";
+  const bot=document.createElement("div");
+  bot.className="message bot";
+  bot.textContent="Generating image...";
+  chatBox.appendChild(bot);
+  const r=await fetch(API+"/generate-image",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt})
+  });
+  const data=await r.json();
+  bot.textContent="";
+  const img=document.createElement("img");
+  img.src=data.image;
+  bot.appendChild(img);
+}
+
+/* HISTORY */
+async function loadHistory(){
+  const r=await fetch(API+"/history?user="+localStorage.username);
+  const d=await r.json();
+  historyDiv.innerHTML="";
+  chatBox.innerHTML="";
+  d.reverse().forEach(m=>{
+    if(m.role==="user") addToSidebar(m.message);
+    append(m.message,m.role);
+  });
+}
+async function clearHistory(){
+  await fetch(API+"/clear-history",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:localStorage.username})
+  });
+  historyDiv.innerHTML="";
+  chatBox.innerHTML="";
+}
+
+// Check API on page load
+checkAPI();
+</script>
+
+</body>
+</html>
